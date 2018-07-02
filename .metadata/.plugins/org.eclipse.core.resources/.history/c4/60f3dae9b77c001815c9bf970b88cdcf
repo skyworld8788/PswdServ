@@ -1,0 +1,378 @@
+package rpc;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.regex.Pattern;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.json.JSONArray;
+
+/**
+ * @Function 	Servlet implementation class UserItem 
+ * 				Fulfill the function of multiple user related queries: 
+ * 					<1> -- /users 
+ * 					<2> -- /users/query[?name=<nq>][&uid=<uq>]... 
+ * 					<3> -- /users/<uid> 
+ * 					<4> -- /users/<uid>/groups
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-29
+ */
+@WebServlet("/users/*") // Support multiple queries.
+public class UserItem extends HttpServlet {
+	private static final long serialVersionUID = 1L;
+	
+	/** Used for relative path */
+	private static final String CFG_PATH = "/WEB-INF/conf.properties";
+	
+	/** Used for passwd name in conf.properties */
+	private static final String CFG_USR_NAME = "passwdFilePath";
+	
+	/** Used for saving /etc/passwd file info */
+	private List<User> usrs;
+
+	/**
+	 * @Function Constructor: HttpServlet#HttpServlet()
+	 */
+	public UserItem() {
+		super();
+		usrs = new ArrayList<User>();
+	}
+	
+	/**
+	 * @Function HttpServlet#init()
+	 */
+	@Override
+	public void init() {
+		
+		String path = null;
+		// Load configuration properties from disk, to get passwd file location.
+		path = readUserCfgFile();
+
+		File tempFile = new File(path.trim());
+		// Get file name
+		String fileName = tempFile.getName();
+		// Get file dir
+		String fileDir = tempFile.getParent();
+		// Load file content to memory, and save to List<User>
+		loadUsrContent(path);
+		// Initiate a new thread to monitor the file changed.
+		Thread t = new Thread() {
+			@Override
+			public void run() {
+				try {
+					monitorUsrMod(fileDir, fileName);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		};
+		t.start();
+	}
+
+	/**
+	 * @Function HttpServlet#doGet(HttpServletRequest request, HttpServletResponse
+	 *      response)
+	 */
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+
+		String uri = request.getRequestURI();
+		System.out.println(uri);
+		// Handle uri: /users
+		if (uri.equals("/PswdServ/users")) {
+			// Convert List<User> to JSONArray
+			JSONArray jArr = RpcHelper.cnvrt2UsrJArr(usrs);
+			
+			// Write to front-end
+			RpcHelper.writeJsonArr(response, jArr);
+			
+		// Handle uri: /users/query?name=xxx&uid=xxx&gui=xxx...
+		} else if (uri.equals("/PswdServ/users/query")) {
+			// Get uri query parameters
+			Map<String, String[]> map = request.getParameterMap();
+			List<User> poUsr = findTarUser(map, usrs);
+			if (poUsr.size() != 0) {
+				RpcHelper.writeJsonObj(response, RpcHelper.cnvrt2UsrJobj(poUsr.get(0)));
+			}
+		// Handle uri: /users/<uid>
+		} else if (Pattern.matches("/PswdServ/users/\\d+", uri)) { // regular expression here
+			String uidVal = uri.split("/")[3];
+
+			List<User> tar = findTarUser("uid", uidVal, usrs);
+			if (tar != null) {
+				for (User tmp : tar) {
+					RpcHelper.writeJsonObj(response, RpcHelper.cnvrt2UsrJobj(tmp));
+				}
+			} else {
+				// no match Gid found, return error code 404.
+				response.setStatus(404);
+			}
+		// Handle uri: /users/<uid>/group
+		} else if (Pattern.matches("/PswdServ/users/\\d+/groups", uri)) { // regular expression here
+			
+			// Get List<Group> info from ServletContext			
+			String uidVal = uri.split("/")[3];
+			List<User> user = findTarUser("uid", uidVal, usrs);
+			if (user.size() == 1) {
+				// Get gid of the user
+				String gidVal = user.get(0).getGid();
+				// Forward the request to GroupItem Sevlet
+				RequestDispatcher rd = request.getRequestDispatcher("/groups/" + gidVal);
+				rd.forward(request, response);
+			}
+		} else {
+			//Extension for future.
+		}
+
+	}
+
+	/**
+	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse
+	 *      response)
+	 */
+	protected void doPost(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+
+		doGet(request, response);
+	}
+
+	/**
+	 * @function 	Load configuration properties from disk, to get passwd location
+	 * @param		null
+	 * @return		pass file directory and name.
+	 * @exception 	FileNotFoundException and IOException		
+	 */
+	private String readUserCfgFile() {
+		Properties props = null;
+		// Get the absolute path
+		String realPath = this.getServletContext().getRealPath(CFG_PATH);
+		try {
+			FileInputStream in = new FileInputStream(realPath);
+			props = new Properties();
+			props.load(in);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return props.getProperty(CFG_USR_NAME);
+	}
+	/**
+	 * @function 	Load the file content to memory(saved in the data structure List<User>
+	 * @param		filePath - String - file directory and name
+	 * @return		
+	 * @exception 	FileNotFoundException and IOException.		
+	 */
+	private void loadUsrContent(String filePath) {
+		FileReader fr = null;
+		BufferedReader br = null;
+		try {
+			fr = new FileReader(filePath);
+			br = new BufferedReader(fr);
+			usrs.clear();
+			String line;
+			while ((line = br.readLine()) != null) {
+				// line to be parsed: "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin"
+				String[] user = line.split(":", 7);
+				// user[0] -- name
+				// suer[1] -- password, no need to track.
+				// user[2] -- uid
+				// user[3] -- gid( -- foreign key)
+				// user[4] -- comment
+				// user[5] -- home
+				// user[6] -- shell
+				User tmp = new User(user[0], user[2], user[3], user[4], user[5], user[6]);
+				usrs.add(tmp);
+			}
+			System.out.println("Finish loading file data to memory.");
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally { // close the file.
+			try {
+				if (br != null) {
+					br.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			} finally {
+				if (fr != null) {
+					try {
+						fr.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+	}	
+	/**
+	 * @function 	Get the exact matched user item for users/<uid> and so on
+	 * @param		queryItem - String - query item like name/uid/gid/comment/home/shell
+	 * 				queryVal - String - corresponding value of queryItem
+	 * 				users - List<User> - all the users loaded to the memory.
+	 * @return		return the exact matched users
+	 * @exception 			
+	 */
+	private List<User> findTarUser(String queryItem, String queryVal, List<User> users) {
+		List<User> res = new ArrayList<>();
+
+		for (Iterator<User> iter = users.iterator(); iter.hasNext();) {
+			User cur = iter.next();
+			switch (queryItem) {
+			case "name": {
+				if (cur.getName().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "uid": {
+				if (cur.getUid().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "gid": {
+				if (cur.getGid().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "comment": {
+				if (cur.getComment().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "home": {
+				if (cur.getHome().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "shell": {
+				if (cur.getShell().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		return res;
+	}
+	/**
+	 * @function 	Get the exact matched user item for users/query?name=xxx&gid=xxx
+	 * @param		map - Map<String, String[]> - query items one of more form name/uid/gid/comment/home/shell
+	 * 				users - List<User> - all the users loaded to the memory.
+	 * @return		return the exact matched users
+	 * @exception 			
+	 */
+	private List<User> findTarUser(Map<String, String[]> map, List<User> users) {
+
+		List<User> res = new ArrayList<>();
+		// Check each user from memory if existing in the HashSet
+		for (Iterator<User> iter = users.iterator(); iter.hasNext();) {
+			User cur = iter.next();
+			// If HashSet contains the item but not match, directly check the next user.
+			if (map.keySet().contains("name")) {
+				
+				if (!map.get("name")[0].equals(cur.getName())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("uid")) {
+				if (!map.get("uid")[0].equals(cur.getUid())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("gid")) {
+				if (!map.get("gid")[0].equals(cur.getGid())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("comment")) {
+				if (!map.get("comment")[0].equals(cur.getComment())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("home")) {
+				if (!map.get("home")[0].equals(cur.getHome())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("shell")) {
+				if (!map.get("shell")[0].equals(cur.getShell())) {
+					continue;
+				}
+			}
+			// If all matched, add to return res.
+			res.add(cur);
+		}
+		return res;
+	}
+	
+	/**
+	 * @function 	Monitor if the passwd file is changed or no, once's changed, reload the file to memory.
+	 * @param		usrDir - String - file directory
+	 * 				usrName - String - file name
+	 * @return		
+	 * @exception 			
+	 */
+	private void monitorUsrMod(String usrDir, String usrName) throws IOException, InterruptedException {
+
+		WatchService watcher = FileSystems.getDefault().newWatchService();
+		// Only check the modification case
+		Paths.get(usrDir).register(watcher, StandardWatchEventKinds.ENTRY_MODIFY); 
+		// Compose to absolute path.
+		Path path = Paths.get(usrDir, usrName);
+
+		while (true) {
+			WatchKey key = watcher.take(); // Start to monitor
+			for (WatchEvent<?> event : key.pollEvents()) {
+				final Path changed = (Path) event.context();
+				if (changed.endsWith(usrName)) {
+					loadUsrContent(Paths.get(usrDir, usrName).toString());
+				}
+			}
+			boolean valid = key.reset();  // Reset watch service once triggered file modification.
+			if (!valid) {
+				break;
+			}
+		}
+
+	}
+	// The main function is used for testing private function.
+	public static void main(String[] args) {
+		
+	}
+
+
+}

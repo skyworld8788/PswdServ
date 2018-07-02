@@ -1,0 +1,21 @@
+package rpc;
+
+public class User {
+	private String name;
+	private String uid;
+	private String gid;
+	private String comment;
+	private String home;
+	private String shell;
+	
+	public User(String name, String uid, String gid, String comment, String home, String shell) {
+		this.name = name;
+		this.uid = uid;
+		this.gid = gid;
+		this.comment = comment;
+		this.home = home;
+		this.shell = shell;
+	}
+	
+	
+}

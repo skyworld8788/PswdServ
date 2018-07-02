@@ -1,0 +1,83 @@
+package rpc;
+/**
+ * @Function 	Group Class saved the /etc/passwd's info 
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-23
+ */ 
+public class User {
+	/** User name */
+	private String name;
+	/** User ID */
+	private String uid;
+	/** Group ID */
+	private String gid;
+	/** Comment info */
+	private String comment;
+	/** Home path */
+	private String home;
+	/** Shell */
+	private String shell;
+	
+	/**
+	 * @Constrcutor
+	 * @param name, uid, gid, comment, home and shell
+	 */
+	public User(String name, String uid, String gid, String comment, String home, String shell) {
+		this.name = name;
+		this.uid = uid;
+		this.gid = gid;
+		this.comment = comment;
+		this.home = home;
+		this.shell = shell;
+	}
+	// Getter and Setter
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getUid() {
+		return uid;
+	}
+
+	public void setUid(String uid) {
+		this.uid = uid;
+	}
+
+	public String getGid() {
+		return gid;
+	}
+
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+
+	public String getComment() {
+		return comment;
+	}
+
+	public void setComment(String comment) {
+		this.comment = comment;
+	}
+
+	public String getHome() {
+		return home;
+	}
+
+	public void setHome(String home) {
+		this.home = home;
+	}
+
+	public String getShell() {
+		return shell;
+	}
+
+	public void setShell(String shell) {
+		this.shell = shell;
+	}
+	
+}

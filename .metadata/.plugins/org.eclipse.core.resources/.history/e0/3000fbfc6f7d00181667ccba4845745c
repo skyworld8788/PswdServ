@@ -1,0 +1,86 @@
+package rpc;
+
+
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.junit.Test;
+import org.skyscreamer.jsonassert.JSONAssert;
+
+
+public class UserItemUnitTest  {
+	@Test
+	public void testFindTarUser() {
+		List<User> users = new ArrayList<>();
+
+		users.add(new User("man","6","12","man","/var/cache/man","/var/cache/man"));
+		users.add(new User("lp","7","7","lp","/var/spool/lpd","/usr/sbin/nologin"));
+		users.add(new User("mail","8","8","mail","/var/mail","/usr/sbin/nologin"));
+		users.add(new User("lp","9","9","news","/var/spool/news","/var/spool/news"));
+		users.add(new User("uucp","10","10","uucp","/var/spool/uucp","/usr/sbin/nologin"));
+		users.add(new User("proxy","13","13","proxy","/bin","/usr/sbin/nologin"));
+		users.add(new User("www-data","33","33","www-data","/var/www","/usr/sbin/nologin"));
+		users.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		users.add(new User("_apt","105","65534","","/nonexistent","/bin/false"));
+		UserItem ui = new UserItem();
+		List<User> actualRes = ui.findTarUser("name", "syslog", users);
+		List<User> expected = new ArrayList<>();
+		expected.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		assertEquals(actualRes, expected);
+		
+		 actualRes = ui.findTarUser("uid", "104", users);
+		 expected = new ArrayList<>();		expected.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		assertEquals(actualRes, expected);
+		
+		
+	}
+
+	@Test
+	public void testCnvrt2UsrJobj() throws JSONException {
+
+		User usr = new User("dnsmasq","109","65534", "dnsmasq,,,","/var/lib/misc", "/bin/false");
+		UserItem ui = new UserItem();
+		JSONObject actualRes = ui.cnvrt2UsrJobj(usr);
+		JSONObject expected = new JSONObject();
+		expected.put("name", "dnsmasq").
+				put("uid", "109").
+				put("gid","65534").
+				put("comment","dnsmasq,,,").
+				put("home","/var/lib/misc").
+				put("shell","/bin/false");
+		JSONAssert.assertEquals(expected, actualRes, true);
+	}
+	@Test
+	public void testCnvrt2UsrJArr() throws JSONException {
+
+		List<User> list = new ArrayList<>();
+		User usr = new User("dnsmasq","109","65534","","/var/lib/misc", "/bin/false");
+		list.add(usr);
+		usr = new User("uuidd","108","112","Hello","/run/uuidd", "/bin/false");
+		list.add(usr);
+		UserItem ui = new UserItem();
+		JSONArray actualRes = ui.cnvrt2UsrJArr(list);
+		JSONArray expected = new JSONArray();
+		expected.put(new JSONObject().put("name", "dnsmasq").
+									put("uid", "109").
+									put("gid","65534").
+									put("comment","").
+									put("home","/var/lib/misc").
+									put("shell","/bin/false"));
+		expected.put(new JSONObject().put("name", "uuidd").
+									put("uid", "108").
+									put("gid","112").
+									put("comment","Hello").
+									put("home","/run/uuidd").
+									put("shell","/bin/false"));
+		JSONAssert.assertEquals(expected, actualRes, true);
+	}
+	
+
+}

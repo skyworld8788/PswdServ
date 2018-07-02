@@ -1,0 +1,6 @@
+# passwd file path: default path is /etc/passwd 
+#passwdFilePath = C:\\Users\\Rick\\Desktop\\passwd
+passwdFilePath = \etc\passwd
+# group file path: default path is /etc/group 
+#groupFilePath = C:\\Users\\Rick\\Desktop\\group
+groupFilePath = \etc\group

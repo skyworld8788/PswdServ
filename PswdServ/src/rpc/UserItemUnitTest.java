@@ -1,0 +1,188 @@
+package rpc;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.junit.Test;
+import org.skyscreamer.jsonassert.JSONAssert;
+
+/* Unit Test for UserItem public func. */
+
+public class UserItemUnitTest  {
+	/**
+	 * func Signature -- findTarUser()
+	 * func return val -- List<User>
+	 * func param  -- queryItem -- String 
+	 * 		       -- queryVal -- String
+	 * 			   -- users -- List<User>
+	 */
+	@Test
+	public void testFindTarUser() {
+		List<User> users = new ArrayList<>();
+
+		users.add(new User("man","6","12","man","/var/cache/man","/var/cache/man"));
+		users.add(new User("lp","7","7","lp","/var/spool/lpd","/usr/sbin/nologin"));
+		users.add(new User("mail","8","8","mail","/var/mail","/usr/sbin/nologin"));
+		users.add(new User("lp","9","9","news","/var/spool/news","/var/spool/news"));
+		users.add(new User("uucp","10","10","uucp","/var/spool/uucp","/usr/sbin/nologin"));
+		users.add(new User("proxy","13","13","proxy","/bin","/usr/sbin/nologin"));
+		users.add(new User("www-data","33","33","www-data","/var/www","/usr/sbin/nologin"));
+		users.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		users.add(new User("_apt","105","65534","","/nonexistent","/bin/false"));
+		UserItem ui = new UserItem();
+		// Test name branch
+		List<User> actualRes = ui.findTarUser("name", "syslog", users);
+		List<User> expected = new ArrayList<>();
+		expected.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		assertEquals(actualRes, expected);
+		// Test uid branch
+		actualRes = ui.findTarUser("uid", "104", users);
+		expected = new ArrayList<>();
+		expected.add(new User("syslog", "104", "108", "", "/home/syslog", "/bin/false"));
+		assertEquals(actualRes, expected);
+		// Test gid branch
+		actualRes = ui.findTarUser("gid", "108", users);
+		expected = new ArrayList<>();
+		expected.add(new User("syslog", "104", "108", "", "/home/syslog", "/bin/false"));
+		assertEquals(actualRes, expected);	
+		// Test home branch
+		actualRes = ui.findTarUser("home", "/home/syslog", users);
+		expected = new ArrayList<>();
+		expected.add(new User("syslog", "104", "108", "", "/home/syslog", "/bin/false"));
+		assertEquals(actualRes, expected);	
+		// test shell branch
+		actualRes = ui.findTarUser("shell", "/bin/false", users);
+		expected = new ArrayList<>();
+		expected.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		expected.add(new User("_apt","105","65534","","/nonexistent","/bin/false"));
+		assertEquals(actualRes, expected);	
+		// Multiple return items
+		actualRes = ui.findTarUser("shell", "/bin/false", users);
+		expected = new ArrayList<>();
+		expected.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		expected.add(new User("_apt","105","65534","","/nonexistent","/bin/false"));
+		assertEquals(actualRes, expected);	
+		
+		// null return items
+		actualRes = ui.findTarUser("shell", "/bin/true", users);
+		expected = new ArrayList<>();
+		assertEquals(actualRes, expected);		
+		
+	}
+	/**
+	 * func Signature -- findTarUser()
+	 * func return val -- List<User>
+	 * func param  -- map -- <String, String[]> 
+	 * 		       -- queryVal -- String
+	 */
+	@Test
+	public void testFindTarUserWithParas() {
+		List<User> users = new ArrayList<>();
+
+		users.add(new User("man","6","12","man","/var/cache/man","/var/cache/man"));
+		users.add(new User("lp","7","7","lp","/var/spool/lpd","/usr/sbin/nologin"));
+		users.add(new User("mail","8","8","mail","/var/mail","/usr/sbin/nologin"));
+		users.add(new User("lp","9","9","news","/var/spool/news","/var/spool/news"));
+		users.add(new User("uucp","10","10","uucp","/var/spool/uucp","/usr/sbin/nologin"));
+		users.add(new User("proxy","13","13","proxy","/bin","/usr/sbin/nologin"));
+		users.add(new User("www-data","33","33","www-data","/var/www","/usr/sbin/nologin"));
+		users.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		users.add(new User("_apt","105","65534","","/nonexistent","/bin/false"));
+		
+		Map<String, String[]> map = new HashMap<>();
+		// test two combines.
+		map.put("name", new String[]{"lp"});
+		map.put("uid", new String[]{"7"});		
+		UserItem ui = new UserItem();
+		List<User> actualRes = ui.findTarUser(map, users);
+		List<User> expected = new ArrayList<>();
+		expected.add(new User("lp","7","7","lp","/var/spool/lpd","/usr/sbin/nologin"));
+		assertEquals(actualRes, expected);
+		
+		// test other combination.
+		map.clear();
+		map.put("uid", new String[]{"104"});
+		map.put("shell", new String[]{"/bin/false"});		
+		actualRes = ui.findTarUser(map, users);
+		expected = new ArrayList<>();
+		expected.add(new User("syslog","104","108","","/home/syslog","/bin/false"));
+		assertEquals(actualRes, expected);	
+		
+		// test mutiple return res.
+		map.clear();
+		map.put("shell", new String[]{"/usr/sbin/nologin"});
+		actualRes = ui.findTarUser(map, users);
+		expected = new ArrayList<>();
+		expected.add(new User("lp","7","7","lp","/var/spool/lpd","/usr/sbin/nologin"));
+		expected.add(new User("mail","8","8","mail","/var/mail","/usr/sbin/nologin"));
+		expected.add(new User("uucp","10","10","uucp","/var/spool/uucp","/usr/sbin/nologin"));
+		expected.add(new User("proxy","13","13","proxy","/bin","/usr/sbin/nologin"));
+		expected.add(new User("www-data","33","33","www-data","/var/www","/usr/sbin/nologin"));
+		
+		assertEquals(actualRes, expected);
+		
+		// test null return res.
+		map.clear();
+		map.put("uid", new String[]{"104"});
+		map.put("shell", new String[]{"/bin/false"});
+		map.put("name", new String[]{"_apt"});
+		actualRes = ui.findTarUser(map, users);
+		expected = new ArrayList<>();
+		assertEquals(actualRes, expected);
+	}
+	/**
+	 * func Signature -- testCnvrt2UsrJobj()
+	 */	
+	@Test
+	public void testCnvrt2UsrJobj() throws JSONException {
+
+		User usr = new User("dnsmasq","109","65534", "dnsmasq,,,","/var/lib/misc", "/bin/false");
+		UserItem ui = new UserItem();
+		JSONObject actualRes = ui.cnvrt2UsrJobj(usr);
+		JSONObject expected = new JSONObject();
+		expected.put("name", "dnsmasq").
+				put("uid", "109").
+				put("gid","65534").
+				put("comment","dnsmasq,,,").
+				put("home","/var/lib/misc").
+				put("shell","/bin/false");
+		JSONAssert.assertEquals(expected, actualRes, true);
+	}
+	/**
+	 * func Signature -- testCnvrt2UsrJArr()
+	 */
+	@Test
+	public void testCnvrt2UsrJArr() throws JSONException {
+
+		List<User> list = new ArrayList<>();
+		User usr = new User("dnsmasq","109","65534","","/var/lib/misc", "/bin/false");
+		list.add(usr);
+		usr = new User("uuidd","108","112","Hello","/run/uuidd", "/bin/false");
+		list.add(usr);
+		UserItem ui = new UserItem();
+		JSONArray actualRes = ui.cnvrt2UsrJArr(list);
+		JSONArray expected = new JSONArray();
+		expected.put(new JSONObject().put("name", "dnsmasq").
+									put("uid", "109").
+									put("gid","65534").
+									put("comment","").
+									put("home","/var/lib/misc").
+									put("shell","/bin/false"));
+		expected.put(new JSONObject().put("name", "uuidd").
+									put("uid", "108").
+									put("gid","112").
+									put("comment","Hello").
+									put("home","/run/uuidd").
+									put("shell","/bin/false"));
+		JSONAssert.assertEquals(expected, actualRes, true);
+	}
+	
+
+}

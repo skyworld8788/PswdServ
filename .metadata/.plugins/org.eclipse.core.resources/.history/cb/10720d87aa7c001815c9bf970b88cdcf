@@ -1,0 +1,98 @@
+package rpc;
+
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * @Function 	Group Class saved the /etc/group's info 
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-23
+ */ 
+public class Group {
+	/** Group name */
+	private String name;
+	/** Group ID */
+	private String gid;
+	/** Group members */
+	private List<String> member;
+	
+	/**
+	 * @Constrcutor
+	 * @param name, gid and members
+	 */
+	public Group(String name, String gid, List<String> member) {
+		this.name = name;
+		this.gid = gid;
+		this.member = new ArrayList<>();
+		if (member.size() == 0) {
+			return;
+		}
+		for (Iterator<String> iter = member.iterator(); iter.hasNext();) {
+			String mem = iter.next();
+			this.member.add(mem);
+		}
+	}
+	/**
+	 * @Getter Get name
+	 * @return name - String
+	 */
+	public String getName() {
+		return name;
+	}
+	/**
+	 * @Setter Set name
+	 * @param name - String
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+	/**
+	 * @Getter  Get gid
+	 * @return gid - String
+	 */
+	public String getGid() {
+		return gid;
+	}
+	/**
+	 * @Setter Set gid
+	 * @param gid - String
+	 */
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+	/**
+	 * @Getter Get members
+	 * @return member - List<String>
+	 */
+	public List<String> getMember() {
+		return member;
+	}
+	/**
+	 * @Setter Set member
+	 * @param member - List<String>
+	 */
+	public void setMember(List<String> member) {
+		this.member = member;
+	}
+	// main func used for unit testing
+	public static void main(String[] args) throws IOException, InterruptedException{
+		
+		String usrDir = "C:\\Users\\Rick\\Desktop\\";
+		String usrName = "passwd";	    	
+
+		Path path = Paths.get(usrDir, usrName);
+		
+
+	
+	}
+}

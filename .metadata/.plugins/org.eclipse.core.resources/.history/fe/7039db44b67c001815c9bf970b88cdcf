@@ -1,0 +1,206 @@
+package rpc;
+
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletResponse;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+/**
+ * @Function 	RPC auxiliary common function class 
+ * 				Help to resolve basic function which Servlets may use. 
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-24
+ */
+public class RpcHelper {
+	
+	
+	public static JSONObject cnvrt2UsrJobj(User user) {
+		
+		JSONObject res = new JSONObject();
+		if (user == null) {
+			return res;
+		}
+		try {
+			
+			res.put("name", user.getName())
+				.put("uid", user.getUid())
+				.put("gid", user.getGid())
+				.put("comment", user.getComment())
+				.put("home", user.getHome())
+				.put("shell", user.getShell());
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	
+	public static JSONArray cnvrt2UsrJArr(List<User> users) {
+		JSONArray res = new JSONArray();
+		
+		Iterator<User> iter = users.iterator();
+		while (iter.hasNext()) {
+			User usr = iter.next();
+			JSONObject usrObj = cnvrt2UsrJobj(usr);
+			res.put(usrObj);
+		}
+		return res;
+	}
+
+	public static JSONObject cnvrt2GrpJobj(Group group) {
+		
+		JSONObject res = new JSONObject();
+		if (group == null) {
+			return res;
+		}
+		StringBuilder sb = new StringBuilder();	
+		sb.append("[");
+		if (group.getMember().size() != 0) {			
+			for (Iterator<String> iter = group.getMember().iterator(); iter.hasNext();) {
+				String cur = iter.next();
+				sb.append(cur);
+				sb.append(",");
+			}
+			sb.deleteCharAt(sb.length() - 1);
+		}
+		sb.append("]");
+		try {
+			
+			res.put("name", group.getName())
+				.put("gid", group.getGid())
+				.put("member", new String(sb));
+
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	public static JSONArray cnvrt2GrpJArr(List<Group> group) {
+		JSONArray res = new JSONArray();
+		
+		Iterator<Group> iter = group.iterator();
+		while (iter.hasNext()) {
+			Group grp = iter.next();
+			JSONObject usrObj = cnvrt2GrpJobj(grp);
+			res.put(usrObj);
+		}
+		return res;
+	}
+	/**
+	 * @function 	Load configuration properties from disk, to get group location
+	 * @param		response - HttpServletResponse
+	 * 				array - JSONArray - used for front-end
+	 * @return		
+	 * @exception 	JSONException		
+	 */		
+	public static void writeJsonObj(HttpServletResponse response, JSONObject obj){
+		try {
+			response.setContentType("application/json");
+			response.addHeader("Access-Control-Allow-Origin", "*");
+			PrintWriter out = response.getWriter();
+			out.print(obj);
+			out.flush();
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	/**
+	 * @function 	Load configuration properties from disk, to get group location
+	 * @param		response - HttpServletResponse
+	 * 				array - JSONArray - used for front-end
+	 * @return		
+	 * @exception 	JSONException		
+	 */	
+	public static void writeJsonArr(HttpServletResponse response, JSONArray array){
+		try {
+			response.setContentType("application/json");
+			response.addHeader("Access-Control-Allow-Origin", "*");
+			PrintWriter out = response.getWriter();
+			out.print(array);
+			out.flush();
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	public static List<Group> findTarGroup(String queryItem, String queryVal, List<Group> groups) {
+		List<Group> res = new ArrayList<>();
+		
+		for (Iterator<Group> iter = groups.iterator(); iter.hasNext();) {
+			Group cur = iter.next();
+			switch (queryItem) {
+			case "name":{
+				if (cur.getName().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "gid":{
+				if (cur.getGid().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "member":{
+				if (cur.getGid().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		return res;
+	}
+	public static List<Group> findTarGrp(Map<String, String[]> map, List<Group> groups) {
+		
+		List<Group> res = new ArrayList<>();
+		
+		for (Iterator<Group> iter = groups.iterator(); iter.hasNext();) {
+			Group cur = iter.next();
+
+			if (map.keySet().contains("name")) {
+				if (!map.get("name")[0].equals(cur.getName())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("gid")) {
+				if (!map.get("gid")[0].equals(cur.getGid())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("member")) {
+				String[] members = map.get("member");
+				boolean match = true;
+				for (String member: members) {
+					boolean inLine = false;
+					for (Iterator<String> mem = cur.getMember().iterator(); mem.hasNext();) {
+						String tmp = mem.next();
+						if (tmp.equals(member)) {
+							inLine = true;
+							break;
+						}
+					}
+					if (!inLine) {
+						match = false;
+						break;
+					}
+				}
+				if (!match) {
+					continue;
+				}
+			}
+			res.add(cur);
+		}
+		return res;
+	}
+}

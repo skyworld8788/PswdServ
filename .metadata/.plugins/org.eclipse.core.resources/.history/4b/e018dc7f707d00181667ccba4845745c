@@ -1,0 +1,192 @@
+package rpc;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * @Function 	Group Class saved the /etc/passwd's info 
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-23
+ */ 
+public class User {
+	/** User name */
+	private String name;
+	/** User ID */
+	private String uid;
+	/** Group ID */
+	private String gid;
+	/** Comment info */
+	private String comment;
+	/** Home path */
+	private String home;
+	/** Shell */
+	private String shell;
+	
+	/**
+	 * @Constrcutor
+	 * @param name, uid, gid, comment, home and shell
+	 */
+	public User(String name, String uid, String gid, String comment, String home, String shell) {
+		this.name = name;
+		this.uid = uid;
+		this.gid = gid;
+		this.comment = comment;
+		this.home = home;
+		this.shell = shell;
+	}
+	/**
+	 * @Getter Get name
+	 * @return name - String
+	 */
+	public String getName() {
+		return name;
+	}
+	/**
+	 * @Setter Set name
+	 * @param name - String
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+	/**
+	 * @Getter  Get uid
+	 * @return uid - String
+	 */
+	public String getUid() {
+		return uid;
+	}
+	/**
+	 * @Setter Set uid
+	 * @param uid - String
+	 */
+	public void setUid(String uid) {
+		this.uid = uid;
+	}
+	/**
+	 * @Getter  Get gid
+	 * @return gid - String
+	 */
+	public String getGid() {
+		return gid;
+	}
+	/**
+	 * @Setter Set gid
+	 * @param gid - String
+	 */
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+	/**
+	 * @Getter  Get comment
+	 * @return comment - String
+	 */
+	public String getComment() {
+		return comment;
+	}
+	/**
+	 * @Setter Set comment
+	 * @param comment - String
+	 */
+	public void setComment(String comment) {
+		this.comment = comment;
+	}
+	/**
+	 * @Getter  Get home
+	 * @return home - String
+	 */
+	public String getHome() {
+		return home;
+	}
+	/**
+	 * @Setter Set home
+	 * @param home - String
+	 */
+	public void setHome(String home) {
+		this.home = home;
+	}
+	/**
+	 * @Getter  Get shell
+	 * @return shell - String
+	 */
+	public String getShell() {
+		return shell;
+	}
+	/**
+	 * @Setter Set shell
+	 * @param shell - String
+	 */
+	public void setShell(String shell) {
+		this.shell = shell;
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (o instanceof User) {
+			return (name.equals(((User) o).getName()) &&
+					uid.equals(((User) o).getUid()) &&
+					gid.equals(((User) o).getGid()) &&
+					comment.equals(((User) o).getComment()) &&
+					home.equals(((User) o).getHome()) &&
+					shell.equals(((User) o).getShell()));
+		}
+		
+		return false;
+	}
+	// main func used for unit testing
+	public static void main(String[] args) throws IOException, InterruptedException{
+		
+        
+		FileReader fr = null;
+		BufferedReader br = null;	
+		String filePath = "C:\\Users\\Rick\\Desktop\\passwd.txt";	
+		List<User> users = new ArrayList<User>();
+		try {
+			fr = new FileReader(filePath);			
+			br = new BufferedReader(fr);
+			String line;
+			while ((line = br.readLine()) != null) {
+				String[] user = line.split(":",7);
+				User tmp = new User(user[0], user[2], user[3], user[4], user[5], user[6]);
+				users.add(tmp);				
+			}
+
+		} catch (FileNotFoundException e) {  
+            e.printStackTrace();  
+        } catch (IOException e) {  
+            e.printStackTrace();  
+        } finally {  
+            try {  
+                if (br != null) {  
+                    br.close();  
+                }  
+            } catch (IOException e) {  
+                e.printStackTrace();  
+            } finally {  
+                if (fr != null) {  
+                    try {  
+                        fr.close();  
+                    } catch (IOException e) {  
+                        e.printStackTrace();  
+                    }  
+                }  
+            }  
+		}
+		System.out.println("-------------User info from the passwd-------------");
+		for (Iterator<User> iter = users.iterator(); iter.hasNext();) {
+			User usr = iter.next();
+			System.out.println("Name:" + usr.getName());
+			System.out.println("Uid:" + usr.getUid());
+			System.out.println("Gid:" + usr.getGid());
+			System.out.println("home:" + usr.getHome());
+			System.out.println("comment:" + usr.getComment());
+			System.out.println("shell:" + usr.getShell());
+			System.out.println("----------------------------------------------------");
+		}
+	}	
+}

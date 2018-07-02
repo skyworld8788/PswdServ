@@ -1,0 +1,48 @@
+package rpc;
+
+import java.util.Iterator;
+import java.util.List;
+
+public class Group {
+
+	private String name;
+	private String gid;
+	private List<String> member;
+	
+	public Group(String name, String gid, List<String> member) {
+		this.name = name;
+		this.gid = gid;
+		this.member = new ArrayList<String>();
+		if (member.size() == 0) {
+			return;
+		}
+		for (Iterator<String> iter = member.iterator(); iter.hasNext();) {
+			String mem = iter.next();
+			this.member.add(mem);
+		}
+	}
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getGid() {
+		return gid;
+	}
+
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+
+	public List<String> getMember() {
+		return member;
+	}
+
+	public void setMember(List<String> member) {
+		this.member = member;
+	}	
+
+}

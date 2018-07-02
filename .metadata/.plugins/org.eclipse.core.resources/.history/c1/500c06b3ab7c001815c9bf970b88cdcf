@@ -1,0 +1,147 @@
+package rpc;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * @Function 	Group Class saved the /etc/group's info 
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-23
+ */ 
+public class Group {
+	/** Group name */
+	private String name;
+	/** Group ID */
+	private String gid;
+	/** Group members */
+	private List<String> member;
+	
+	/**
+	 * @Constrcutor
+	 * @param name, gid and members
+	 */
+	public Group(String name, String gid, List<String> member) {
+		this.name = name;
+		this.gid = gid;
+		this.member = new ArrayList<>();
+		if (member.size() == 0) {
+			return;
+		}
+		for (Iterator<String> iter = member.iterator(); iter.hasNext();) {
+			String mem = iter.next();
+			this.member.add(mem);
+		}
+	}
+	/**
+	 * @Getter Get name
+	 * @return name - String
+	 */
+	public String getName() {
+		return name;
+	}
+	/**
+	 * @Setter Set name
+	 * @param name - String
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+	/**
+	 * @Getter  Get gid
+	 * @return gid - String
+	 */
+	public String getGid() {
+		return gid;
+	}
+	/**
+	 * @Setter Set gid
+	 * @param gid - String
+	 */
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+	/**
+	 * @Getter Get members
+	 * @return member - List<String>
+	 */
+	public List<String> getMember() {
+		return member;
+	}
+	/**
+	 * @Setter Set member
+	 * @param member - List<String>
+	 */
+	public void setMember(List<String> member) {
+		this.member = member;
+	}
+	// main func used for unit testing
+	public static void main(String[] args) throws IOException, InterruptedException{
+		
+        
+		FileReader fr = null;
+		BufferedReader br = null;	
+		String filePath = "C:\\Users\\Rick\\Desktop\\group.txt";	
+		List<Group> groups = new ArrayList<Group>();
+		try {
+			fr = new FileReader(filePath);			
+			br = new BufferedReader(fr);
+			String line;
+			while ((line = br.readLine()) != null) {
+				String[] group = line.split(":",4);
+				List<String> member = new ArrayList<>();
+				if (!group[3].isEmpty()) {
+					String[] tmpArr = group[3].split(",");
+					for (String ele: tmpArr) {
+						member.add(ele);
+					}
+				}
+
+				Group tmp = new Group(group[0], group[2], member);
+				groups.add(tmp);						
+			}
+
+		} catch (FileNotFoundException e) {  
+            e.printStackTrace();  
+        } catch (IOException e) {  
+            e.printStackTrace();  
+        } finally {  
+            try {  
+                if (br != null) {  
+                    br.close();  
+                }  
+            } catch (IOException e) {  
+                e.printStackTrace();  
+            } finally {  
+                if (fr != null) {  
+                    try {  
+                        fr.close();  
+                    } catch (IOException e) {  
+                        e.printStackTrace();  
+                    }  
+                }  
+            }  
+		}
+		System.out.println("-------------Group info from the group-------------");
+		for (Iterator<Group> iter = groups.iterator(); iter.hasNext();) {
+			Group grp = iter.next();
+			System.out.println("Name:" + grp.getName());
+			System.out.println("Gid:" + grp.getGid());
+			System.out.println("Members:" + grp.getMember());
+			System.out.println("----------------------------------------------------");
+		}
+
+	}
+}

@@ -1,0 +1,40 @@
+package rpc;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+public class User {
+	private String name;
+	private String uid;
+	private String gid;
+	private String comment;
+	private String home;
+	private String shell;
+	
+	public User(String name, String uid, String gid, String comment, String home, String shell) {
+		this.name = name;
+		this.uid = uid;
+		this.gid = gid;
+		this.comment = comment;
+		this.home = home;
+		this.shell = shell;
+	}
+	
+	public JSONObject convert2Jobj(User user) {
+		if (user == null) {
+			return null;
+		}
+		try {
+			JSONObject res = new JSONObject();
+			res.put("name", name)
+				.put("uid", uid)
+				.put("gid", gid)
+				.put("comment", comment)
+				.put("home", home)
+				.put("shell", shell);
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+}

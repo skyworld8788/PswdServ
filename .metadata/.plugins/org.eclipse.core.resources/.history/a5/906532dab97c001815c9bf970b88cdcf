@@ -1,0 +1,396 @@
+package rpc;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.regex.Pattern;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+
+/**
+ * @Function 	Servlet implementation class GroupItem 
+ * 				Fulfill the function of multiple user related queries: 
+ * 					<1> -- /group 
+ * 					<2> -- /group/query[?name=<nq>][&gid=<uq>]... 
+ * 					<3> -- /group/<gid>
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-30
+ */ 
+@WebServlet("/groups/*") // Support multiple queries.
+public class GroupItem extends HttpServlet {
+	private static final long serialVersionUID = 1L;
+	
+	/** Used for relative path */
+	private static final String CFG_PATH = "/WEB-INF/conf.properties";
+	
+	/** Used for group name in conf.properties */
+	private static final String CFG_GRP_NAME = "groupFilePath";
+	
+	/** Used for saving /etc/group file info */
+	private List<Group> groups;
+     
+    /**
+     * @Function Constructor: HttpServlet#HttpServlet()
+     */
+    public GroupItem() {
+        super();
+        groups = new ArrayList<Group>();
+    }
+    
+	/**
+	 * @Function HttpServlet#init()
+	 */
+    @Override
+    public void init() {
+    	
+    	String path = null;
+    	// Load configuration properties from disk, to get passwd file location.
+    	path = readGrpCfgFile();
+
+		File tempFile = new File(path.trim());
+		// Get file name
+		String fileName = tempFile.getName();
+		// Get file dir
+		String fileDir = tempFile.getParent();
+		// Load file content to memory, and save to List<Group>
+		loadGrpContent(path);
+		
+		// Initiate a new thread to monitor the file changed. the reason why no share same thread
+		// with UserItem, the directory of passwd and group maybe different.
+		Thread t = new Thread() {
+			@Override
+			public void run() {
+				try {
+					monitorGrpMod(fileDir, fileName);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		};
+
+		t.start();
+    }
+ 
+	/**
+	 * @Function HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
+	 */
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		String uri = request.getRequestURI();
+		System.out.println(uri);
+		// Handle uri: /groups
+		if (uri.equals("/PswdServ/groups")) {
+			// Convert List<Group> to JSONArray
+			JSONArray jArr = cnvrt2GrpJArr(groups);
+			
+			// Write to front-end
+			RpcHelper.writeJsonArr(response, jArr);
+		
+		// Handle uri: /groups/query?name=xxx&gid=xxx&member=xxx...
+		} else if (uri.equals("/PswdServ/groups/query")) {
+			// Get uri query parameters
+			Map<String, String[]> map = request.getParameterMap();
+			List<Group> poGrp = findTarGrp(map, groups);
+			if (poGrp.size() != 0) {
+				RpcHelper.writeJsonArr(response, cnvrt2GrpJArr(poGrp));
+			}
+		// Handle uri: /groups/<gid>	
+		} else if (Pattern.matches("/PswdServ/groups/\\d+", uri)) {
+			String gidVal = uri.split("/")[3];			
+			List<Group> tar = findTarGroup("gid", gidVal, groups);
+			if (tar != null) {
+				for (Group tmp: tar){
+					RpcHelper.writeJsonObj(response, cnvrt2GrpJobj(tmp));
+				}
+			} else {
+				// no match Gid found, return error code 404.
+				response.setStatus(404);
+			}			
+		} else {
+			//Extension for future.
+		}
+	}
+
+	/**
+	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 */
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		// TODO Auto-generated method stub
+		doGet(request, response);
+	}
+	
+	/**
+	 * @function 	Load configuration properties from disk, to get group location
+	 * @param		null
+	 * @return		pass file directory and name.
+	 * @exception 	FileNotFoundException and IOException		
+	 */
+	private String readGrpCfgFile() {
+		Properties props = null;
+		// Get the absolute path
+		String realPath = this.getServletContext().getRealPath(CFG_PATH);
+		try {
+			FileInputStream in = new FileInputStream(realPath);
+			props = new Properties();
+			props.load(in);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return props.getProperty(CFG_GRP_NAME);
+	}
+	
+	/**
+	 * @function 	Load the file content to memory(saved in the data structure List<Group>
+	 * @param		filePath - String - file directory and name
+	 * @return		
+	 * @exception 	FileNotFoundException and IOException.		
+	 */
+	private void loadGrpContent(String filePath) {
+		FileReader fr = null;
+		BufferedReader br = null;
+		try {
+			fr = new FileReader(filePath);
+			br = new BufferedReader(fr);
+			groups.clear();
+			String line;
+			while ((line = br.readLine()) != null) {
+				// line to be parsed: "adm:x:4:syslog,rick"
+				String[] group = line.split(":",4);
+				List<String> member = new ArrayList<>();
+				if (!group[3].isEmpty()) {
+					// member to be parsed: "syslog,rick"
+					String[] tmpArr = group[3].split(",");
+					for (String ele: tmpArr) {
+						member.add(ele);
+					}
+				}
+				// group[0] -- name
+				// group[1] -- password, no need to track.
+				// group[2] -- gid( -- foreign key)
+				// group[3] -- member (List<String>)
+				Group tmp = new Group(group[0], group[2], member);
+				groups.add(tmp);
+			}
+			System.out.println("Finish loading file data to memory.");
+						
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally { // close the file.
+			try {
+				if (br != null) {
+					br.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			} finally {
+				if (fr != null) {
+					try {
+						fr.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+	}
+	/**
+	 * @function 	Monitor if the group file is changed or no, once's changed, reload the file to memory.
+	 * @param		usrDir - String - file directory
+	 * 				usrName - String - file name
+	 * @return		
+	 * @exception 			
+	 */
+	private void monitorGrpMod(String usrDir, String usrName) throws IOException, InterruptedException {
+
+		WatchService watcher = FileSystems.getDefault().newWatchService();
+		// Only check the modification case
+		Paths.get(usrDir).register(watcher, StandardWatchEventKinds.ENTRY_MODIFY); 
+		// Compose to absolute path.
+		Path path = Paths.get(usrDir, usrName);
+
+		while (true) {
+			WatchKey key = watcher.take(); // Start to monitor
+			for (WatchEvent<?> event : key.pollEvents()) {
+				final Path changed = (Path) event.context();
+				if (changed.endsWith(usrName)) {
+					loadGrpContent(Paths.get(usrDir, usrName).toString());
+				}
+			}
+			boolean valid = key.reset();  // Reset watch service once triggered file modification.
+			if (!valid) {
+				break;
+			}
+		}
+	}
+	/**
+	 * @function 	Get the exact matched user item for users/<uid> and so on
+	 * @param		queryItem - String - query item like name/uid/gid/comment/home/shell
+	 * 				queryVal - String - corresponding value of queryItem
+	 * 				users - List<User> - all the users loaded to the memory.
+	 * @return		return the exact matched users
+	 * @exception 			
+	 */
+	private List<Group> findTarGroup(String queryItem, String queryVal, List<Group> groups) {
+		List<Group> res = new ArrayList<>();
+		
+		for (Iterator<Group> iter = groups.iterator(); iter.hasNext();) {
+			Group cur = iter.next();
+			switch (queryItem) {
+			case "name":{
+				if (cur.getName().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "gid":{
+				if (cur.getGid().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			case "member":{
+				if (cur.getGid().equals(queryVal)) {
+					res.add(cur);
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		return res;
+	}
+	/**
+	 * @function 	Get the exact matched group item for groups/query?name=xxx&gid=xxx
+	 * @param		map - Map<String, String[]> - query items one of more form name/gid/member
+	 * 				groups - List<Group> - all the groups loaded to the memory.
+	 * @return		return the exact matched groups
+	 * @exception 			
+	 */
+	private List<Group> findTarGrp(Map<String, String[]> map, List<Group> groups) {
+		
+		List<Group> res = new ArrayList<>();
+		// Check each group from memory if existing in the HashSet
+		for (Iterator<Group> iter = groups.iterator(); iter.hasNext();) {
+			Group cur = iter.next();
+			// If HashSet contains the item but not match, directly check the next user.
+			if (map.keySet().contains("name")) {
+				if (!map.get("name")[0].equals(cur.getName())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("gid")) {
+				if (!map.get("gid")[0].equals(cur.getGid())) {
+					continue;
+				}
+			}
+			if (map.keySet().contains("member")) {
+				String[] members = map.get("member");
+				boolean match = true;
+				for (String member: members) {
+					boolean inLine = false;
+					// check all the elements of the array, if one not match the group, go to the next group
+					for (Iterator<String> mem = cur.getMember().iterator(); mem.hasNext();) {
+						String tmp = mem.next();
+						if (tmp.equals(member)) {
+							inLine = true;
+							break;
+						}
+					}
+					if (!inLine) {
+						match = false;
+						break;
+					}
+				}
+				if (!match) {
+					continue;
+				}
+			}
+			// If all matched, add to return res.
+			res.add(cur);
+		}
+		return res;
+	}
+
+	/**
+	 * @function 	Convert the Group instance to JSONObject
+	 * @param		group - Group - Group instance
+	 * @return		JSONObject
+	 * @exception 	JSONException		
+	 */
+	private JSONObject cnvrt2GrpJobj(Group group) {
+		
+		JSONObject res = new JSONObject();
+		if (group == null) {
+			return res;
+		}
+		// Compose all matched members in one array
+		StringBuilder sb = new StringBuilder();	
+		sb.append("[");
+		if (group.getMember().size() != 0) {			
+			for (Iterator<String> iter = group.getMember().iterator(); iter.hasNext();) {
+				String cur = iter.next();
+				sb.append(cur);
+				sb.append(",");
+			}
+			sb.deleteCharAt(sb.length() - 1);
+		}
+		sb.append("]");
+		try {
+			
+			res.put("name", group.getName())
+				.put("gid", group.getGid())
+				.put("member", new String(sb));
+
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	/**
+	 * @function 	Convert the User array to JSONArray
+	 * @param		user - List<User> - User Array instance
+	 * @return		JSONArray
+	 * @exception 	JSONException		
+	 */	
+	private JSONArray cnvrt2GrpJArr(List<Group> group) {
+		JSONArray res = new JSONArray();
+		
+		Iterator<Group> iter = group.iterator();
+		while (iter.hasNext()) {
+			Group grp = iter.next();
+			JSONObject usrObj = cnvrt2GrpJobj(grp);
+			res.put(usrObj);
+		}
+		return res;
+	}
+}

@@ -1,0 +1,98 @@
+package rpc;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+
+public class Group {
+
+	private String name;
+	private String gid;
+	private List<String> member;
+	
+	public Group(String name, String gid, List<String> member) {
+		this.name = name;
+		this.gid = gid;
+		this.member = new ArrayList<>();
+		if (member.size() == 0) {
+			return;
+		}
+		for (Iterator<String> iter = member.iterator(); iter.hasNext();) {
+			String mem = iter.next();
+			this.member.add(mem);
+		}
+	}
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getGid() {
+		return gid;
+	}
+
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+
+	public List<String> getMember() {
+		return member;
+	}
+
+	public void setMember(List<String> member) {
+		this.member = member;
+	}
+	
+
+
+
+    public static void main(String[] args) throws InterruptedException {
+        try {
+            String fName =" G:\\Java_Source\\navigation_tigra_menu\\demo1\\img\\lev1_arrow.gif ";  
+            
+      
+            File tempFile = new File( fName.trim());  
+      
+            String fileName = tempFile.getName();  
+            String fileDir = tempFile.getParent();
+            System.out.println(Paths.get(fileDir, fileName).toString());
+            System.out.println("fileDir = " + fileDir);  
+            System.out.println("fileName = " + fileName);
+            
+            WatchService watcher = FileSystems.getDefault().newWatchService();
+            Paths.get("C:\\Users\\Rick\\Desktop")
+            .register(watcher, StandardWatchEventKinds.ENTRY_MODIFY);
+            while(true){
+                WatchKey key = watcher.take();
+                for(WatchEvent<?> event : key.pollEvents()){
+                    final Path changed = (Path) event.context();
+                    System.out.println(changed);
+                    if (changed.endsWith("Task.txt")) {
+                        System.out.println("My file has changed");
+                    }
+                }
+                //÷ÿ…ËWatchKey
+                boolean vaild = key.reset();
+                if(!vaild)
+                    break;
+            }
+
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+}

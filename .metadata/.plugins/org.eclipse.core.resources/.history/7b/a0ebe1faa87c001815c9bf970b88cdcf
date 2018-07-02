@@ -1,0 +1,95 @@
+package rpc;
+
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * @Function 	Servlet implementation class GroupItem 
+ * 				Fulfill the function of multiple user related queries: 
+ * 					<1> -- /group 
+ * 					<2> -- /group/query[?name=<nq>][&gid=<uq>]... 
+ * 					<3> -- /group/<gid>
+ * @author 		Rick Liu
+ * @version 	v0.1.0
+ * @Time 		2018-6-23
+ */ 
+public class Group {
+
+	private String name;
+	private String gid;
+	private List<String> member;
+	
+	public Group(String name, String gid, List<String> member) {
+		this.name = name;
+		this.gid = gid;
+		this.member = new ArrayList<>();
+		if (member.size() == 0) {
+			return;
+		}
+		for (Iterator<String> iter = member.iterator(); iter.hasNext();) {
+			String mem = iter.next();
+			this.member.add(mem);
+		}
+	}
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getGid() {
+		return gid;
+	}
+
+	public void setGid(String gid) {
+		this.gid = gid;
+	}
+
+	public List<String> getMember() {
+		return member;
+	}
+
+	public void setMember(List<String> member) {
+		this.member = member;
+	}
+	
+	public static void main(String[] args) throws IOException, InterruptedException{
+		
+		String usrDir = "C:\\Users\\Rick\\Desktop\\123";
+		String usrName = "passwd.txt";
+	    	
+		WatchService watcher = FileSystems.getDefault().newWatchService();
+		Paths.get(usrDir).register(watcher, StandardWatchEventKinds.ENTRY_MODIFY);
+
+		Path path = Paths.get(usrDir, usrName);
+		
+		while (true) {
+			WatchKey key = watcher.take();
+			for (WatchEvent<?> event: key.pollEvents()) {
+                final Path changed = (Path) event.context();
+                System.out.println(changed);
+                if (changed.endsWith(usrName)) {
+                    System.out.println("My file has changed");
+                    //loadUsrContent(Paths.get(usrDir, usrName).toString());
+                }
+			}
+			
+			boolean valid = key.reset();
+			if (!valid) {
+				break;
+			}
+		}
+	
+	}
+}
